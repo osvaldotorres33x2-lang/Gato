@@ -22,26 +22,34 @@ jobs:
     - name: Configurar Python
       uses: actions/setup-python@v5
       with:
-        python-version: '3.11'  # Versión estable, moderna y 100% compatible con Buildozer
+        python-version: '3.11'
 
-    - name: Instalar Buildozer y Dependencias
+    - name: Instalar Buildozer y Herramientas de Compilación
       run: |
         pip install --upgrade pip
-        pip install buildozer cython==3.0.8  # Versión moderna de Cython para Python 3.11
+        pip install virtualenv
+        # Forzar Cython menor a 3.0 es crucial para que compilen las recetas de Pygame en Android
+        pip install buildozer "cython<3.0"  
         sudo apt-get update
-        sudo apt-get install -y build-essential libsqlite3-dev libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev libsdl2-ttf-dev libportmidi-dev libswscale-dev libavformat-dev libavcodec-dev zlib1g-dev
+        # Instalar TODAS las herramientas de compilación de bajo nivel necesarias para compilar C/C++ en Android
+        sudo apt-get install -y build-essential ccache git libffi-dev libssl-dev autoconf automake libtool pkg-config patch unzip zip zlib1g-dev
+        sudo apt-get install -y libsqlite3-dev libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev libsdl2-ttf-dev libportmidi-dev libswscale-dev libavformat-dev libavcodec-dev
 
-    - name: Crear buildozer.spec
+    - name: Crear y Configurar buildozer.spec de forma Segura
       run: |
         buildozer init
-        # Modificar el archivo de configuración automáticamente
-        sed -i 's/title = My Application/title = Gato Llaves/g' buildozer.spec
-        sed -i 's/package.name = myapp/package.name = gatollaves/g' buildozer.spec
-        sed -i 's/requirements = python3,kivy/requirements = python3,pygame/g' buildozer.spec
-        sed -i 's/orientation = landscape/orientation = portrait/g' buildozer.spec
+        # Reemplazos ultra-seguros usando expresiones regulares para evitar fallos de sintaxis
+        sed -i 's/.*title =.*/title = Gato Llaves/g' buildozer.spec
+        sed -i 's/.*package.name =.*/package.name = gatollaves/g' buildozer.spec
+        sed -i 's/.*requirements =.*/requirements = python3,pygame/g' buildozer.spec
+        sed -i 's/.*orientation =.*/orientation = portrait/g' buildozer.spec
+        # FORZAR la aceptación de las licencias del SDK de Android para que la consola no se quede esperando confirmación
+        sed -i 's/.*android.accept_sdk_license.*/android.accept_sdk_license = True/g' buildozer.spec
 
     - name: Compilar APK con Buildozer
       run: |
+        # Usamos export para evitar advertencias de ejecución como root si llegase a ocurrir
+        export BUILDOZER_ALLOW_KIVY_NEW_DESIGN=1
         yes | buildozer -v android debug
 
     - name: Subir el APK finalizado
@@ -49,4 +57,3 @@ jobs:
       with:
         name: JuegoGatoLlaves-APK
         path: bin/*.apk
- 
