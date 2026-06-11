@@ -22,35 +22,50 @@ jobs:
     - name: Configurar Python
       uses: actions/setup-python@v5
       with:
-        python-version: '3.11'
+        python-version: '3.10' # Python 3.10 es el más compatible con la rama estable de Android NDK actualmente
 
-    - name: Instalar Buildozer y Herramientas de Compilación
+    - name: Instalar Buildozer y Dependencias del Sistema
       run: |
         pip install --upgrade pip
         pip install virtualenv
-        # Forzar Cython menor a 3.0 es crucial para que compilen las recetas de Pygame en Android
-        pip install buildozer "cython<3.0"  
+        pip install "cython<3.0"
+        pip install buildozer
         sudo apt-get update
-        # Instalar TODAS las herramientas de compilación de bajo nivel necesarias para compilar C/C++ en Android
         sudo apt-get install -y build-essential ccache git libffi-dev libssl-dev autoconf automake libtool pkg-config patch unzip zip zlib1g-dev
         sudo apt-get install -y libsqlite3-dev libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev libsdl2-ttf-dev libportmidi-dev libswscale-dev libavformat-dev libavcodec-dev
+        # Herramientas adicionales para empaquetado de Android de 32/64 bits
+        sudo apt-get install -y libncurses5:amd64 libstdc++6:i386 libgtk2.0-0:i386 libpango1.0-0:i386
 
-    - name: Crear y Configurar buildozer.spec de forma Segura
+    - name: Configurar archivo buildozer.spec
       run: |
         buildozer init
-        # Reemplazos ultra-seguros usando expresiones regulares para evitar fallos de sintaxis
+        # Aplicamos cambios directos y seguros para evitar desconfiguración
         sed -i 's/.*title =.*/title = Gato Llaves/g' buildozer.spec
         sed -i 's/.*package.name =.*/package.name = gatollaves/g' buildozer.spec
         sed -i 's/.*requirements =.*/requirements = python3,pygame/g' buildozer.spec
         sed -i 's/.*orientation =.*/orientation = portrait/g' buildozer.spec
-        # FORZAR la aceptación de las licencias del SDK de Android para que la consola no se quede esperando confirmación
+        # Aceptación de licencias automática
         sed -i 's/.*android.accept_sdk_license.*/android.accept_sdk_license = True/g' buildozer.spec
+        # Asegurar permisos de escritura y que no busque recursos innecesarios
+        sed -i 's/.*pimplied_features =.*/pimplied_features = False/g' buildozer.spec
 
-    - name: Compilar APK con Buildozer
+    - name: Compilar APK con Buildozer y Mostrar Logs en Fallo
       run: |
-        # Usamos export para evitar advertencias de ejecución como root si llegase a ocurrir
         export BUILDOZER_ALLOW_KIVY_NEW_DESIGN=1
-        yes | buildozer -v android debug
+        # Ejecutar compilación y si falla, imprimir las últimas 150 líneas del log detallado para ver la causa exacta
+        if ! yes | buildozer -v android debug; then
+          echo "========================================================"
+          echo "           LA COMPILACIÓN FALLÓ - MOSTRANDO LOGS         "
+          echo "========================================================"
+          if [ -f ~/.buildozer/android/platform/build-arm64-v8a/dists/gatollaves__arm64-v8a/build.log ]; then
+            tail -n 150 ~/.buildozer/android/platform/build-arm64-v8a/dists/gatollaves__arm64-v8a/build.log
+          elif [ -f ~/.buildozer/build.log ]; then
+            tail -n 150 ~/.buildozer/build.log
+          else
+            echo "No se encontró un archivo de log específico."
+          fi
+          exit 1
+        fi
 
     - name: Subir el APK finalizado
       uses: actions/upload-artifact@v4
