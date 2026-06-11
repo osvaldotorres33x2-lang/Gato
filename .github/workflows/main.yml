@@ -1,0 +1,51 @@
+name: Compilar APK de Python
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Descargar Código
+      uses: actions/checkout@v3
+
+    - name: Configurar Java
+      uses: actions/setup-java@v3
+      with:
+        distribution: 'temurin'
+        java-version: '17'
+
+    - name: Configurar Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+
+    - name: Instalar Buildozer y Dependencias
+      run: |
+        pip install --upgrade pip
+        pip install buildozer cython==0.29.33
+        sudo apt-get update
+        sudo apt-get install -y build-essential libsqlite3-dev libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev libsdl2-ttf-dev libportmidi-dev libswscale-dev libavformat-dev libavcodec-dev zlib1g-dev
+
+    - name: Crear buildozer.spec
+      run: |
+        buildozer init
+        # Modificar el archivo de configuración automáticamente
+        sed -i 's/title = My Application/title = Gato Llaves/g' buildozer.spec
+        sed -i 's/package.name = myapp/package.name = gatollaves/g' buildozer.spec
+        sed -i 's/requirements = python3,kivy/requirements = python3,pygame/g' buildozer.spec
+        sed -i 's/orientation = landscape/orientation = portrait/g' buildozer.spec
+
+    - name: Compilar APK con Buildozer
+      run: |
+        yes | buildozer -v android debug
+
+    - name: Subir el APK finalizado
+      uses: actions/upload-artifact@v3
+      with:
+        name: JuegoGatoLlaves-APK
+        path: bin/*.apk
