@@ -22,7 +22,7 @@ jobs:
     - name: Configurar Python
       uses: actions/setup-python@v5
       with:
-        python-version: '3.10' # Python 3.10 es el más compatible con la rama estable de Android NDK actualmente
+        python-version: '3.10'
 
     - name: Instalar Buildozer y Dependencias del Sistema
       run: |
@@ -31,28 +31,24 @@ jobs:
         pip install "cython<3.0"
         pip install buildozer
         sudo apt-get update
+        # Instalamos solo los paquetes esenciales de 64 bits para evitar conflictos de arquitectura (error 100)
         sudo apt-get install -y build-essential ccache git libffi-dev libssl-dev autoconf automake libtool pkg-config patch unzip zip zlib1g-dev
         sudo apt-get install -y libsqlite3-dev libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev libsdl2-ttf-dev libportmidi-dev libswscale-dev libavformat-dev libavcodec-dev
-        # Herramientas adicionales para empaquetado de Android de 32/64 bits
-        sudo apt-get install -y libncurses5:amd64 libstdc++6:i386 libgtk2.0-0:i386 libpango1.0-0:i386
 
     - name: Configurar archivo buildozer.spec
       run: |
         buildozer init
-        # Aplicamos cambios directos y seguros para evitar desconfiguración
+        # Configuraciones seguras del archivo de construcción
         sed -i 's/.*title =.*/title = Gato Llaves/g' buildozer.spec
         sed -i 's/.*package.name =.*/package.name = gatollaves/g' buildozer.spec
         sed -i 's/.*requirements =.*/requirements = python3,pygame/g' buildozer.spec
         sed -i 's/.*orientation =.*/orientation = portrait/g' buildozer.spec
-        # Aceptación de licencias automática
         sed -i 's/.*android.accept_sdk_license.*/android.accept_sdk_license = True/g' buildozer.spec
-        # Asegurar permisos de escritura y que no busque recursos innecesarios
-        sed -i 's/.*pimplied_features =.*/pimplied_features = False/g' buildozer.spec
 
     - name: Compilar APK con Buildozer y Mostrar Logs en Fallo
       run: |
         export BUILDOZER_ALLOW_KIVY_NEW_DESIGN=1
-        # Ejecutar compilación y si falla, imprimir las últimas 150 líneas del log detallado para ver la causa exacta
+        # Compilación directa
         if ! yes | buildozer -v android debug; then
           echo "========================================================"
           echo "           LA COMPILACIÓN FALLÓ - MOSTRANDO LOGS         "
