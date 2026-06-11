@@ -31,24 +31,32 @@ jobs:
         pip install "cython<3.0"
         pip install buildozer
         sudo apt-get update
-        # Instalamos solo los paquetes esenciales de 64 bits para evitar conflictos de arquitectura (error 100)
         sudo apt-get install -y build-essential ccache git libffi-dev libssl-dev autoconf automake libtool pkg-config patch unzip zip zlib1g-dev
         sudo apt-get install -y libsqlite3-dev libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev libsdl2-ttf-dev libportmidi-dev libswscale-dev libavformat-dev libavcodec-dev
 
-    - name: Configurar archivo buildozer.spec
+    - name: Configurar archivo buildozer.spec de manera blindada
       run: |
         buildozer init
-        # Configuraciones seguras del archivo de construcción
+        # Configuraciones Generales
         sed -i 's/.*title =.*/title = Gato Llaves/g' buildozer.spec
         sed -i 's/.*package.name =.*/package.name = gatollaves/g' buildozer.spec
         sed -i 's/.*requirements =.*/requirements = python3,pygame/g' buildozer.spec
         sed -i 's/.*orientation =.*/orientation = portrait/g' buildozer.spec
+        
+        # Configuraciones Críticas de Android para evitar fallos del NDK con Pygame
         sed -i 's/.*android.accept_sdk_license.*/android.accept_sdk_license = True/g' buildozer.spec
+        sed -i 's/.*android.api =.*/android.api = 33/g' buildozer.spec
+        sed -i 's/.*android.minapi =.*/android.minapi = 21/g' buildozer.spec
+        sed -i 's/.*android.ndk =.*/android.ndk = 25b/g' buildozer.spec
+        sed -i 's/.*android.archs =.*/android.archs = arm64-v8a/g' buildozer.spec
 
-    - name: Compilar APK con Buildozer y Mostrar Logs en Fallo
+    - name: Compilar APK con Buildozer y Diagnóstico de Errores
       run: |
+        # Variables de entorno esenciales para servidores en la nube ejecutados como root
+        export BUILDOZER_WARN_ON_ROOT=0
         export BUILDOZER_ALLOW_KIVY_NEW_DESIGN=1
-        # Compilación directa
+        
+        # Ejecución y volcado de errores específicos si falla
         if ! yes | buildozer -v android debug; then
           echo "========================================================"
           echo "           LA COMPILACIÓN FALLÓ - MOSTRANDO LOGS         "
@@ -58,7 +66,8 @@ jobs:
           elif [ -f ~/.buildozer/build.log ]; then
             tail -n 150 ~/.buildozer/build.log
           else
-            echo "No se encontró un archivo de log específico."
+            echo "No se encontró el archivo de log en la ruta estándar. Buscando archivos .log..."
+            find ~/ -name "*.log" -exec tail -n 50 {} \;
           fi
           exit 1
         fi
