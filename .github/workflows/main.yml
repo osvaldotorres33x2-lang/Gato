@@ -22,7 +22,7 @@ jobs:
     - name: Configurar Python
       uses: actions/setup-python@v5
       with:
-        python-version: '3.10'
+        python-version: '3.9'  # Usar Python 3.9 que es el más maduro para empaquetar con pygame-bootstrap
 
     - name: Instalar Buildozer y Dependencias del Sistema
       run: |
@@ -34,41 +34,32 @@ jobs:
         sudo apt-get install -y build-essential ccache git libffi-dev libssl-dev autoconf automake libtool pkg-config patch unzip zip zlib1g-dev
         sudo apt-get install -y libsqlite3-dev libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev libsdl2-ttf-dev libportmidi-dev libswscale-dev libavformat-dev libavcodec-dev
 
-    - name: Configurar archivo buildozer.spec de manera blindada
+    - name: Configurar archivo buildozer.spec de manera robusta
       run: |
         buildozer init
-        # Configuraciones Generales
+        # Configuraciones seguras del archivo de construcción
         sed -i 's/.*title =.*/title = Gato Llaves/g' buildozer.spec
         sed -i 's/.*package.name =.*/package.name = gatollaves/g' buildozer.spec
         sed -i 's/.*requirements =.*/requirements = python3,pygame/g' buildozer.spec
         sed -i 's/.*orientation =.*/orientation = portrait/g' buildozer.spec
-        
-        # Configuraciones Críticas de Android para evitar fallos del NDK con Pygame
         sed -i 's/.*android.accept_sdk_license.*/android.accept_sdk_license = True/g' buildozer.spec
         sed -i 's/.*android.api =.*/android.api = 33/g' buildozer.spec
         sed -i 's/.*android.minapi =.*/android.minapi = 21/g' buildozer.spec
         sed -i 's/.*android.ndk =.*/android.ndk = 25b/g' buildozer.spec
         sed -i 's/.*android.archs =.*/android.archs = arm64-v8a/g' buildozer.spec
 
-    - name: Compilar APK con Buildozer y Diagnóstico de Errores
+    - name: Compilar APK con Captura de Errores Críticos
       run: |
-        # Variables de entorno esenciales para servidores en la nube ejecutados como root
         export BUILDOZER_WARN_ON_ROOT=0
         export BUILDOZER_ALLOW_KIVY_NEW_DESIGN=1
         
-        # Ejecución y volcado de errores específicos si falla
+        # Ejecutamos la compilación. Si falla, forzamos la lectura de logs de manera recursiva en todo el sistema.
         if ! yes | buildozer -v android debug; then
           echo "========================================================"
-          echo "           LA COMPILACIÓN FALLÓ - MOSTRANDO LOGS         "
+          echo "             LOGS DE ERROR DETALLADOS DE PYTHON         "
           echo "========================================================"
-          if [ -f ~/.buildozer/android/platform/build-arm64-v8a/dists/gatollaves__arm64-v8a/build.log ]; then
-            tail -n 150 ~/.buildozer/android/platform/build-arm64-v8a/dists/gatollaves__arm64-v8a/build.log
-          elif [ -f ~/.buildozer/build.log ]; then
-            tail -n 150 ~/.buildozer/build.log
-          else
-            echo "No se encontró el archivo de log en la ruta estándar. Buscando archivos .log..."
-            find ~/ -name "*.log" -exec tail -n 50 {} \;
-          fi
+          # Buscar cualquier log de build, crash o debug generado en el sistema de Android SDK/NDK
+          find ~/.buildozer/ -name "build.log" -exec echo "--- LOG ENCONTRADO EN {} ---" \; -exec tail -n 200 {} \;
           exit 1
         fi
 
