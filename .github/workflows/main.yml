@@ -22,7 +22,7 @@ jobs:
     - name: Configurar Python
       uses: actions/setup-python@v5
       with:
-        python-version: '3.9'  # Usar Python 3.9 que es el más maduro para empaquetar con pygame-bootstrap
+        python-version: '3.9'
 
     - name: Instalar Buildozer y Dependencias del Sistema
       run: |
@@ -34,7 +34,52 @@ jobs:
         sudo apt-get install -y build-essential ccache git libffi-dev libssl-dev autoconf automake libtool pkg-config patch unzip zip zlib1g-dev
         sudo apt-get install -y libsqlite3-dev libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev libsdl2-ttf-dev libportmidi-dev libswscale-dev libavformat-dev libavcodec-dev
 
-    - name: Configurar archivo buildozer.spec de manera robusta
+    - name: Crear buildozer.spec Perfecto (Sin Duplicados)
+      run: |
+        # Escribimos un archivo buildozer.spec minimalista y limpio desde cero para evitar errores de duplicación.
+        cat << 'EOF' > buildozer.spec
+        [app]
+        title = Gato Llaves
+        package.name = gatollaves
+        package.domain = org.gatollaves
+        source.dir = .
+        source.include_exts = py,png,jpg,ttf
+        version = 1.0.0
+        requirements = python3,pygame
+        orientation = portrait
+        fullscreen = 1
+        
+        # Ajustes de Android
+        android.api = 33
+        android.minapi = 21
+        android.ndk = 25b
+        android.accept_sdk_license = True
+        android.archs = arm64-v8a
+        
+        [buildozer]
+        log_level = 2
+        warn_on_root = 0
+        EOF
+
+    - name: Compilar APK con Captura de Errores Críticos
+      run: |
+        export BUILDOZER_WARN_ON_ROOT=0
+        export BUILDOZER_ALLOW_KIVY_NEW_DESIGN=1
+        
+        # Ejecutamos la compilación. Si falla, forzamos la lectura de logs.
+        if ! yes | buildozer -v android debug; then
+          echo "========================================================"
+          echo "             LOGS DE ERROR DETALLADOS DE PYTHON         "
+          echo "========================================================"
+          find ~/.buildozer/ -name "build.log" -exec echo "--- LOG ENCONTRADO EN {} ---" \; -exec tail -n 200 {} \;
+          exit 1
+        fi
+
+    - name: Subir el APK finalizado
+      uses: actions/upload-artifact@v4
+      with:
+        name: JuegoGatoLlaves-APK
+        path: bin/*.apk    - name: Configurar archivo buildozer.spec de manera robusta
       run: |
         buildozer init
         # Configuraciones seguras del archivo de construcción
